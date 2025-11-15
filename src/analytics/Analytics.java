@@ -3,7 +3,6 @@ package analytics;
 import model.OrderResult;
 import model.Product;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -59,7 +58,7 @@ public class Analytics {
                 .limit(3)
                 .forEach(entry ->
                         System.out.printf("%s - %d units sold%n",
-                                entry.getKey().getName(),
+                                entry.getKey().name(),
                                 entry.getValue())
                 );
     }

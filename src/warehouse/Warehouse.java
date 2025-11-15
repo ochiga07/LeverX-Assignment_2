@@ -15,7 +15,7 @@ public class Warehouse {
         this.inventory = new ConcurrentHashMap<>();
     }
 
-    public void addStock(Product product, int quantity){
+    public void addStock(Product product, int quantity) {
         inventory.put(product, inventory.getOrDefault(product, 0) + quantity);
     }
 
@@ -27,14 +27,14 @@ public class Warehouse {
 
             if(requestedQuantity > availableQuantity) {
                 System.out.printf("[FAILED] %s - Not enough stock for %s (requested: %d, available: %d)%n",
-                        order, product.getName(), requestedQuantity, availableQuantity);
+                        order, product.name(), requestedQuantity, availableQuantity);
                 return OrderResult.failure(order);
             }
         }
         return processSuccessfulOrder(order);
     }
 
-    private OrderResult processSuccessfulOrder(Order order){
+    private OrderResult processSuccessfulOrder(Order order) {
         Map<Product, Integer> purchasedItems = new HashMap<>();
         double totalProfit = 0;
 
@@ -44,11 +44,11 @@ public class Warehouse {
 
             inventory.compute(product, (_, currQuantity) -> currQuantity - quantity);
             purchasedItems.put(product, quantity);
-            totalProfit += product.getPrice() * quantity;
+            totalProfit += product.price() * quantity;
         }
 
         System.out.printf("[SUCCESS] %s - Total: $%.2f%n", order, totalProfit);
-        return OrderResult.success(order, totalProfit, purchasedItems);
+        return OrderResult.success(order, totalProfit);
     }
 
     public void displayInventory() {
