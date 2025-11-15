@@ -1,0 +1,113 @@
+import actors.Customer;
+import actors.WarehouseWorker;
+import analytics.Analytics;
+import model.Order;
+import model.OrderResult;
+import model.Product;
+import warehouse.Warehouse;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.concurrent.*;
+
+
+public class OnlineShop {
+    private static final int NUM_CUSTOMERS = 5;
+    private static final int NUM_WORKERS = 3;
+    private static final int ORDERS_PER_CUSTOMER = 4;
+    private static final int ORDER_QUEUE_CAPACITY = 15;
+    private static final int CUSTOMER_TIMEOUT_SEC = 10;
+    private static final int WORKER_TIMEOUT_SEC = 10;
+
+    public static void main(String[] args) throws InterruptedException {
+        System.out.println("----ONLINE SHOP SIMULATION----");
+
+        List<Product> catalog = createCatalog();
+        Warehouse warehouse = initializeWarehouse(catalog);
+        warehouse.displayInventory();
+
+        // Shared resources
+        BlockingQueue<Order> orderQueue = new LinkedBlockingQueue<>(ORDER_QUEUE_CAPACITY);
+        List<OrderResult> results = Collections.synchronizedList(new ArrayList<>());
+        Order poisonPill = new Order("POISON_PILL");
+
+        // Start workers first
+        ExecutorService workerService = runWorkers(orderQueue, warehouse, results, poisonPill);
+
+        // Start customers concurrently
+        runCustomers(orderQueue, catalog);
+
+        // all customers finished, add NUM_WORKERS poison pills
+        for (int i = 0; i < NUM_WORKERS; i++) {
+            orderQueue.put(poisonPill);
+        }
+
+        // Shutdown workers
+        workerService.shutdown();
+        if (!workerService.awaitTermination(WORKER_TIMEOUT_SEC, TimeUnit.SECONDS)) {
+            System.out.println("Worker threads did not finish in time!");
+        }
+
+        warehouse.displayInventory();
+        Analytics.runAnalytics(results);
+    }
+
+
+    private static List<Product> createCatalog() {
+        return Arrays.asList(
+                new Product("Laptop", 1000),
+                new Product("Mouse", 30),
+                new Product("Keyboard", 80),
+                new Product("Monitor", 300),
+                new Product("Headphones", 150)
+        );
+    }
+
+    private static Warehouse initializeWarehouse(List<Product> catalog) {
+        Warehouse warehouse = new Warehouse();
+        warehouse.addStock(catalog.get(0), 10); // Laptop
+        warehouse.addStock(catalog.get(1), 20); // Mouse
+        warehouse.addStock(catalog.get(2), 15); // Keyboard
+        warehouse.addStock(catalog.get(3), 8);  // Monitor
+        warehouse.addStock(catalog.get(4), 12); // Headphones
+        return warehouse;
+    }
+
+    private static void runCustomers(BlockingQueue<Order> orderQueue, List<Product> catalog)
+            throws InterruptedException {
+
+        try (ExecutorService customerService = Executors.newFixedThreadPool(NUM_CUSTOMERS)) {
+            for (int i = 1; i <= NUM_CUSTOMERS; i++) {
+                customerService.submit(new Customer(
+                        "Customer-" + i,
+                        orderQueue,
+                        catalog,
+                        ORDERS_PER_CUSTOMER
+                ));
+            }
+
+            customerService.shutdown();
+            if (!customerService.awaitTermination(CUSTOMER_TIMEOUT_SEC, TimeUnit.SECONDS)) {
+                System.out.println("Customer threads did not finish in time!");
+            }
+        }
+    }
+
+    private static ExecutorService runWorkers(BlockingQueue<Order> orderQueue, Warehouse warehouse,
+                                              List<OrderResult> results, Order poisonPill) {
+
+        ExecutorService workerService = Executors.newFixedThreadPool(NUM_WORKERS);
+        for (int i = 1; i <= NUM_WORKERS; i++) {
+            workerService.submit(new WarehouseWorker(
+                    i,
+                    orderQueue,
+                    warehouse,
+                    results,
+                    poisonPill
+            ));
+        }
+        return workerService;
+    }
+}
