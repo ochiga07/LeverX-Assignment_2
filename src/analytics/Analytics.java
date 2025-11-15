@@ -58,7 +58,7 @@ public class Analytics {
                 .limit(3)
                 .forEach(entry ->
                         System.out.printf("%s - %d units sold%n",
-                                entry.getKey().getName(),
+                                entry.getKey().name(),
                                 entry.getValue())
                 );
     }
@@ -107,7 +107,7 @@ public class Analytics {
                     double percent = totalInteraction > 0 ? (reservedQty * 100.0 / totalInteraction) : 0.0;
 
                     System.out.printf("  %s: %.2f%% reserved (%d reserved, %d sold)%n",
-                            product.getName(), percent, reservedQty, soldQty);
+                            product.name(), percent, reservedQty, soldQty);
                 });
     }
 }

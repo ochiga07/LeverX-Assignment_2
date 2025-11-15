@@ -32,8 +32,6 @@ public class WarehouseWorker implements Runnable {
                 Order order = orderQueue.take();
 
                 if (order == poisonPill) {
-                    // put the poison pill back for other workers and stop
-                    //orderQueue.put(poisonPill);
                     break;
                 }
 

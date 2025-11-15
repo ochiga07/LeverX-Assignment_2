@@ -21,23 +21,11 @@ public class Order {
         items.put(product, items.getOrDefault(product, 0) + quantity);
     }
 
-    public int getOrderId(){
-        return orderId;
-    }
-
-    public String getCustomerName() {
-        return customerName;
-    }
 
     public Map<Product, Integer> getItems() {
         return Collections.unmodifiableMap(items);
     }
 
-    public double calculateTotal() {
-        return items.entrySet().stream()
-                .mapToDouble(e -> e.getKey().price() * e.getValue())
-                .sum();
-    }
 
     @Override
     public String toString() {

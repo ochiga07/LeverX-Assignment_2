@@ -24,7 +24,7 @@ public class Warehouse {
         reservedInventory.putIfAbsent(product, 0);
     }
 
-    public synchronized boolean reserveProducts(Reservation reservation) {
+    public synchronized void reserveProducts(Reservation reservation) {
         // check if all items are available
         for (Map.Entry<Product, Integer> entry : reservation.getReservedItems().entrySet()) {
             Product product = entry.getKey();
@@ -33,14 +33,13 @@ public class Warehouse {
 
             if (availableQuantity < requestedQuantity) {
                 System.out.printf("[RESERVATION FAILED] %s - Not enough stock for %s (requested: %d, available: %d)%n",
-                        reservation, product.getName(), requestedQuantity, availableQuantity);
-                return false;
+                        reservation, product.name(), requestedQuantity, availableQuantity);
+                return;
             }
         }
 
         // reserve the items
         reserveItems(reservation);
-        return true;
     }
 
     public synchronized void reserveItems(Reservation reservation){
@@ -54,12 +53,12 @@ public class Warehouse {
         System.out.printf("[RESERVATION SUCCESS] %s created%n", reservation);
     }
 
-    public synchronized boolean cancelReservation(int reservationId) {
+    public synchronized void cancelReservation(int reservationId) {
         Reservation reservation = findReservation(reservationId);
 
         if (reservation == null || !reservation.isActive()) {
             System.out.printf("[CANCEL FAILED] Reservation #%d not found or already cancelled%n", reservationId);
-            return false;
+            return;
         }
 
         // cancel the reservation and back up products
@@ -71,7 +70,6 @@ public class Warehouse {
 
         reservation.cancel();
         System.out.printf("[RESERVATION CANCELLED] %s%n", reservation);
-        return true;
     }
 
     public synchronized OrderResult processOrder(Order order) {
@@ -83,7 +81,7 @@ public class Warehouse {
 
             if (availableQuantity < requestedQuantity) {
                 System.out.printf("[ORDER FAILED] %s - Not enough stock for %s (requested: %d, available: %d)%n",
-                        order, product.getName(), requestedQuantity, availableQuantity);
+                        order, product.name(), requestedQuantity, availableQuantity);
                 return OrderResult.failure(order);
             }
         }
@@ -102,7 +100,7 @@ public class Warehouse {
 
             inventory.compute(product, (_, currQuantity) -> currQuantity - quantity);
             purchasedItems.put(product, quantity);
-            totalProfit += product.getPrice() * quantity;
+            totalProfit += product.price() * quantity;
         }
 
         System.out.printf("[ORDER SUCCESS] %s - Total: $%.2f%n", order, totalProfit);
