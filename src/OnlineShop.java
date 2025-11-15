@@ -4,39 +4,57 @@ import analytics.Analytics;
 import model.Order;
 import model.OrderResult;
 import model.Product;
+import model.Reservation;
 import warehouse.Warehouse;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.*;
+import java.util.Random;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 
 public class OnlineShop {
+
     private static final int NUM_CUSTOMERS = 5;
     private static final int NUM_WORKERS = 3;
-    private static final int ORDERS_PER_CUSTOMER = 4;
-    private static final int ORDER_QUEUE_CAPACITY = 15;
+    private static final int ORDERS_PER_CUSTOMER = 3;
+    private static final int RESERVATIONS_PER_CUSTOMER = 2;
+
+    private static final int ORDER_QUEUE_CAPACITY = 20;
     private static final int CUSTOMER_TIMEOUT_SEC = 10;
     private static final int WORKER_TIMEOUT_SEC = 10;
 
     public static void main(String[] args) throws InterruptedException {
-        System.out.println("----ONLINE SHOP SIMULATION----");
+        System.out.println("-----ONLINE SHOP SIMULATION WITH RESERVATIONS----");
 
         List<Product> catalog = createCatalog();
         Warehouse warehouse = initializeWarehouse(catalog);
         warehouse.displayInventory();
 
-        // Shared resources
         BlockingQueue<Order> orderQueue = new LinkedBlockingQueue<>(ORDER_QUEUE_CAPACITY);
         List<OrderResult> results = Collections.synchronizedList(new ArrayList<>());
         Order poisonPill = new Order("POISON_PILL");
 
-        // Start workers first
+        // reservation phase
+        System.out.println("PHASE 1: CUSTOMERS CREATE RESERVATIONS");
+        createReservations(catalog, warehouse);
+        warehouse.displayInventory();
+
+        System.out.println("PHASE 2: CANCEL SOME RESERVATIONS");
+        cancelSomeReservations(warehouse);
+        warehouse.displayInventory();
+
+        // order processing phase
+        System.out.println("PHASE 3: STARTING WORKERS");
         ExecutorService workerService = runWorkers(orderQueue, warehouse, results, poisonPill);
 
-        // Start customers concurrently
+        System.out.println("PHASE 4: CUSTOMERS PLACING ORDERS");
         runCustomers(orderQueue, catalog);
 
         // all customers finished, add NUM_WORKERS poison pills
@@ -51,7 +69,8 @@ public class OnlineShop {
         }
 
         warehouse.displayInventory();
-        Analytics.runAnalytics(results);
+
+        Analytics.runAnalytics(results, warehouse);
     }
 
 
@@ -75,23 +94,56 @@ public class OnlineShop {
         return warehouse;
     }
 
-    private static void runCustomers(BlockingQueue<Order> orderQueue, List<Product> catalog)
+    private static void createReservations(List<Product> catalog, Warehouse warehouse) {
+        Random random = new Random();
+
+        for (int c = 1; c <= NUM_CUSTOMERS; c++) {
+            for (int r = 0; r < RESERVATIONS_PER_CUSTOMER; r++) {
+
+                Reservation reservation = new Reservation("Customer-" + c);
+
+                int itemCount = random.nextInt(2) + 1;
+                for (int k = 0; k < itemCount; k++) {
+                    Product product = catalog.get(random.nextInt(catalog.size()));
+                    int quantity = random.nextInt(5) + 1;
+                    reservation.addItem(product, quantity);
+                }
+
+                warehouse.reserveProducts(reservation);
+            }
+        }
+    }
+
+    private static void cancelSomeReservations(Warehouse warehouse) {
+        Random random = new Random();
+
+        List<Reservation> reservations = warehouse.getReservations();
+        int toCancel = reservations.size() / 2;
+
+        for (int i = 0; i < toCancel; i++) {
+            int reservationId = random.nextInt(reservations.size()) + 1;
+            warehouse.cancelReservation(reservationId);
+        }
+    }
+
+
+    private static void runCustomers(BlockingQueue<Order> queue, List<Product> catalog)
             throws InterruptedException {
 
-        try (ExecutorService customerService = Executors.newFixedThreadPool(NUM_CUSTOMERS)) {
-            for (int i = 1; i <= NUM_CUSTOMERS; i++) {
-                customerService.submit(new Customer(
-                        "Customer-" + i,
-                        orderQueue,
-                        catalog,
-                        ORDERS_PER_CUSTOMER
-                ));
-            }
+        ExecutorService customerService = Executors.newFixedThreadPool(NUM_CUSTOMERS);
 
-            customerService.shutdown();
-            if (!customerService.awaitTermination(CUSTOMER_TIMEOUT_SEC, TimeUnit.SECONDS)) {
-                System.out.println("Customer threads did not finish in time!");
-            }
+        for (int i = 1; i <= NUM_CUSTOMERS; i++) {
+            customerService.submit(new Customer(
+                    "Customer-" + i,
+                    queue,
+                    catalog,
+                    ORDERS_PER_CUSTOMER
+            ));
+        }
+
+        customerService.shutdown();
+        if (!customerService.awaitTermination(CUSTOMER_TIMEOUT_SEC, TimeUnit.SECONDS)) {
+            System.out.println("Customer threads did not finish in time!");
         }
     }
 
